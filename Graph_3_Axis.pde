@@ -1,5 +1,18 @@
-//this allows you to look at 3 analog outputs at the same time in processing
+/*
+Processing Serial Grapher
+by Ewan Sinclair, based on on code by Tom Igoe and Jen Kirchherr:
+http://itp.nyu.edu/physcomp/sensors/Code/DataloggerMulti
+http://itp.nyu.edu/physcomp/sensors/Code/Multi
+
+March 11 2010
+
+This will read 3 variables as bytes from a serial connection and graph their values in real time.
+Send a byte of value 255 before each frame of three bytes, which must range from 0-254 in value.
+To allow for positive and negative values, adjust the axisOrigin array with offsets for each axis.
+*/
+
 import processing.serial.*;
+import java.io.*;
 
 Serial myPort; 
 int[] serialInArray = new int[3];    
@@ -14,6 +27,12 @@ boolean firstContact = false;
 //Track how many bytes in we are from a newline
 int byteCounter=0;
 
+//Used to track frequency of datapoints
+int dataPointCounter=0;
+int prevMillis=1001; //Frequency doesn't track if this isn't initially >1000, as the value of millis() is very different if set here
+int frequency=0;
+int timer=0;
+
 //Size of the graph display area
 int graphXsize=400;
 int graphYsize=300;
@@ -26,6 +45,8 @@ int currentDataPoint=0;
 int[] axisOrigin={121,121,120};
 
 boolean debug=false;
+
+//Graphics variables
 PFont fonty;
 PGraphics buffer1;
 
@@ -47,24 +68,33 @@ void setup () {
 
 void draw () {
 
+  if(millis()-prevMillis >= 1000){
+   frequency=dataPointCounter;
+   dataPointCounter=0;
+   prevMillis=millis();
+   timer++;
+  }
+  buffer1.background(0);
   drawGraph(buffer1);
+  drawFrequency(buffer1);
   image(buffer1,0,0);
 
   while (myPort.available() > 0) {
     processByte(myPort.read());
   }
-  /*
-  if (firstContact == false) {
-   delay(300);
-   myPort.write(65);
-   }
-   */
+}
+
+void drawFrequency(PGraphics g){
+  g.beginDraw();
+  g.textFont(fonty);
+  g.text("Freq: "+frequency+"Hz",105,20);
+  g.text("Secs: "+timer,105,35);
+  g.endDraw();
 }
 
 void drawGraph(PGraphics g){
   //Draws a black background, followed by the lines for each input (X,Y,Z) using the historical data in the round-robin array
-  buffer1.beginDraw();
-  g.background(0);
+  g.beginDraw();
   g.textFont(fonty);
   g.text("X: "+storedValues[currentDataPoint][0],10,20);
   g.text("Y: "+storedValues[currentDataPoint][1],10,35);
@@ -119,6 +149,7 @@ void nextDataPoint(){
   else{
     currentDataPoint=0; 
   }
+  dataPointCounter++;
 }
 
 void processByte( int inByte) {
